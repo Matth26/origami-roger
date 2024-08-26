@@ -58,14 +58,21 @@ mod erc721_balance_component {
     use dojo::world::{
         IWorldProvider, IWorldProviderDispatcher, IWorldDispatcher, IWorldDispatcherTrait
     };
-    use origami_token::components::introspection::src5::{ISRC5Dispatcher, ISRC5DispatcherTrait};
+    use origami_token::components::introspection::src5::{
+        ISRC5Dispatcher, ISRC5DispatcherTrait,
+        src5_component, src5_component::SRC5,
+    };    
     use origami_token::components::token::erc721::erc721_approval::erc721_approval_component as erc721_approval_comp;
     use origami_token::components::token::erc721::erc721_owner::erc721_owner_component as erc721_owner_comp;
+    use origami_token::components::token::erc721::erc721_enumerable::erc721_enumerable_component as erc721_enumerable_comp;
     use origami_token::components::token::erc721::interface::{
-        IERC721_RECEIVER_ID, IERC721ReceiverDispatcher, IERC721ReceiverDispatcherTrait
+        IERC721ReceiverDispatcher, IERC721ReceiverDispatcherTrait,
+        IERC721_RECEIVER_ID, IERC721_ENUMERABLE_ID,
     };
     use erc721_approval_comp::InternalImpl as ERC721ApprovalInternal;
     use erc721_owner_comp::InternalImpl as ERC721OwnerInternal;
+    use erc721_enumerable_comp::InternalImpl as ERC721EnumerableInternal;
+
 
     #[storage]
     struct Storage {}
@@ -98,6 +105,8 @@ mod erc721_balance_component {
         +IWorldProvider<TContractState>,
         impl ERC721Approval: erc721_approval_comp::HasComponent<TContractState>,
         impl ERC721Owner: erc721_owner_comp::HasComponent<TContractState>,
+        impl ERC721Enumerable: erc721_enumerable_comp::HasComponent<TContractState>,
+        impl SRC5: src5_component::HasComponent<TContractState>,
         +Drop<TContractState>
     > of IERC721Balance<ComponentState<TContractState>> {
         fn balance_of(self: @ComponentState<TContractState>, account: ContractAddress) -> u256 {
@@ -116,6 +125,7 @@ mod erc721_balance_component {
                 erc721_approval.is_approved_or_owner(get_caller_address(), token_id),
                 Errors::UNAUTHORIZED
             );
+            assert(!to.is_zero(), Errors::INVALID_RECEIVER);
             self.transfer_internal(from, to, token_id)
         }
 
@@ -131,6 +141,7 @@ mod erc721_balance_component {
                 erc721_approval.is_approved_or_owner(get_caller_address(), token_id),
                 Errors::UNAUTHORIZED
             );
+            assert(!to.is_zero(), Errors::INVALID_RECEIVER);
             self.safe_transfer_internal(from, to, token_id, data);
         }
     }
@@ -142,6 +153,8 @@ mod erc721_balance_component {
         +IWorldProvider<TContractState>,
         impl ERC721Approval: erc721_approval_comp::HasComponent<TContractState>,
         impl ERC721Owner: erc721_owner_comp::HasComponent<TContractState>,
+        impl ERC721Enumerable: erc721_enumerable_comp::HasComponent<TContractState>,
+        impl SRC5: src5_component::HasComponent<TContractState>,
         +Drop<TContractState>
     > of IERC721BalanceCamel<ComponentState<TContractState>> {
         fn balanceOf(self: @ComponentState<TContractState>, account: ContractAddress) -> u256 {
@@ -175,6 +188,8 @@ mod erc721_balance_component {
         +IWorldProvider<TContractState>,
         impl ERC721Approval: erc721_approval_comp::HasComponent<TContractState>,
         impl ERC721Owner: erc721_owner_comp::HasComponent<TContractState>,
+        impl ERC721Enumerable: erc721_enumerable_comp::HasComponent<TContractState>,
+        impl SRC5: src5_component::HasComponent<TContractState>,
         +Drop<TContractState>
     > of InternalTrait<TContractState> {
         fn get_balance(
@@ -186,7 +201,7 @@ mod erc721_balance_component {
         }
 
         fn set_balance(
-            self: @ComponentState<TContractState>, account: ContractAddress, amount: u256
+            ref self: ComponentState<TContractState>, account: ContractAddress, amount: u256
         ) {
             set!(
                 self.get_contract().world(),
@@ -200,19 +215,32 @@ mod erc721_balance_component {
             to: ContractAddress,
             token_id: u256
         ) {
-            assert(!to.is_zero(), Errors::INVALID_RECEIVER);
             let mut erc721_approval = get_dep_component_mut!(ref self, ERC721Approval);
             let mut erc721_owner = get_dep_component_mut!(ref self, ERC721Owner);
 
-            let owner = erc721_owner.get_owner(token_id).address;
-            assert(from == owner, Errors::WRONG_SENDER);
+            // not minting, reduce balance
+            if (from != Zeroable::zero()) {
+                let owner = erc721_owner.get_owner(token_id).address;
+                assert(from == owner, Errors::WRONG_SENDER);
 
-            // Implicit clear approvals, no need to emit an event
-            erc721_approval.set_token_approval(owner, Zeroable::zero(), token_id, false);
+                // Implicit clear approvals, no need to emit an event
+                erc721_approval.set_token_approval(owner, Zeroable::zero(), token_id, false);
 
-            self.set_balance(from, self.get_balance(from).amount.into() - 1);
-            self.set_balance(to, self.get_balance(to).amount.into() + 1);
+                self.set_balance(from, self.get_balance(from).amount.into() - 1);
+            }
+
+            // not burning, increase balance
+            if (to != Zeroable::zero()) {
+                self.set_balance(to, self.get_balance(to).amount.into() + 1);
+            }
+
             erc721_owner.set_owner(token_id, to);
+
+            let src5 = get_dep_component!(@self, SRC5);
+            if src5.supports_interface(IERC721_ENUMERABLE_ID) {
+                let mut erc721_enumerable = get_dep_component_mut!(ref self, ERC721Enumerable);
+                erc721_enumerable.after_transfer(from, to, token_id);
+            }
 
             let transfer_event = Transfer { from, to, token_id };
 
@@ -242,7 +270,6 @@ mod erc721_balance_component {
             data: Span<felt252>
         ) -> bool {
             let src5_dispatcher = ISRC5Dispatcher { contract_address: to };
-
             if src5_dispatcher.supports_interface(IERC721_RECEIVER_ID) {
                 let erc721_dispatcher = IERC721ReceiverDispatcher { contract_address: to };
                 erc721_dispatcher
