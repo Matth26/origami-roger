@@ -16,7 +16,7 @@ trait IERC721EnumMintBurnPreset<TState> {
     fn symbol(self: @TState) -> ByteArray;
     fn token_uri(ref self: TState, token_id: u256) -> ByteArray;
     // IERC721MetadataCamel
-    fn tokenURI(self: @TState, token_id: u256) -> ByteArray;
+    fn tokenURI(ref self: TState, token_id: u256) -> ByteArray;
 
     // IERC721Owner
     fn owner_of(self: @TState, token_id: u256) -> ContractAddress;

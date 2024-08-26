@@ -87,7 +87,7 @@ mod erc721_metadata_component {
         impl SRC5: src5_comp::HasComponent<TContractState>,
         +Drop<TContractState>,
     > of IERC721MetadataCamel<ComponentState<TContractState>> {
-        fn tokenURI(self: @ComponentState<TContractState>, tokenId: u256) -> ByteArray {
+        fn tokenURI(ref self: ComponentState<TContractState>, tokenId: u256) -> ByteArray {
             self.get_uri(tokenId)
         }
     }
