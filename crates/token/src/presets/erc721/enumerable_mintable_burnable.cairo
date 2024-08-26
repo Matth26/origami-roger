@@ -3,31 +3,27 @@ use dojo::world::IWorldDispatcher;
 
 #[starknet::interface]
 trait IERC721EnumMintBurnPreset<TState> {
-    // IERC721
-    fn name(self: @TState) -> ByteArray;
-    fn symbol(self: @TState) -> ByteArray;
-    fn token_uri(ref self: TState, token_id: u256) -> ByteArray;
-    fn owner_of(self: @TState, account: ContractAddress) -> bool;
-    fn get_approved(self: @TState, token_id: u256) -> ContractAddress;
-    fn approve(ref self: TState, to: ContractAddress, token_id: u256);
-    fn total_supply(self: @TState) -> u256;
-    fn token_by_index(self: @TState, index: u256) -> u256;
-    fn token_of_owner_by_index(self: @TState, owner: ContractAddress, index: u256) -> u256;
-
-    // IERC721CamelOnly
-    fn tokenURI(ref self: TState, token_id: u256) -> ByteArray;
-
     // IWorldProvider
     fn world(self: @TState,) -> IWorldDispatcher;
 
-    fn initializer(
-        ref self: TState,
-        name: ByteArray,
-        symbol: ByteArray,
-        base_uri: ByteArray,
-        recipient: ContractAddress,
-        token_ids: Span<u256>
-    );
+    // ISRC5
+    fn supports_interface(self: @TState, interface_id: felt252) -> bool;
+    // ISRC5Camel
+    fn supportsInterface(self: @TState, interfaceId: felt252) -> bool;
+
+    // IERC721Metadata
+    fn name(self: @TState) -> ByteArray;
+    fn symbol(self: @TState) -> ByteArray;
+    fn token_uri(ref self: TState, token_id: u256) -> ByteArray;
+    // IERC721MetadataCamel
+    fn tokenURI(ref self: TState, token_id: u256) -> ByteArray;
+
+    // IERC721Owner
+    fn owner_of(self: @TState, token_id: u256) -> ContractAddress;
+    // IERC721OwnerCamel
+    fn ownerOf(self: @TState, token_id: u256) -> ContractAddress;
+
+    // IERC721Balance
     fn balance_of(self: @TState, account: ContractAddress) -> u256;
     fn transfer_from(ref self: TState, from: ContractAddress, to: ContractAddress, token_id: u256);
     fn safe_transfer_from(
@@ -37,8 +33,49 @@ trait IERC721EnumMintBurnPreset<TState> {
         token_id: u256,
         data: Span<felt252>
     );
+    // IERC721BalanceCamel
+    fn balanceOf(self: @TState, account: ContractAddress) -> u256;
+    fn transferFrom(ref self: TState, from: ContractAddress, to: ContractAddress, token_id: u256);
+    fn safeTransferFrom(
+        ref self: TState,
+        from: ContractAddress,
+        to: ContractAddress,
+        token_id: u256,
+        data: Span<felt252>
+    );
+
+    // IERC721Approval
+    fn get_approved(self: @TState, token_id: u256) -> ContractAddress;
+    fn is_approved_for_all(self: @TState, owner: ContractAddress, operator: ContractAddress) -> bool;
+    fn approve(ref self: TState, to: ContractAddress, token_id: u256);
+    fn set_approval_for_all(ref self: TState, operator: ContractAddress, approved: bool);
+    // IERC721ApprovalCamel
+    fn getApproved(self: @TState, token_id: u256) -> ContractAddress;
+    fn isApprovedForAll(self: @TState, owner: ContractAddress, operator: ContractAddress) -> bool;
+    fn setApprovalForAll(ref self: TState, operator: ContractAddress, approved: bool);
+
+    // IERC721Enumerable
+    fn total_supply(self: @TState) -> u256;
+    fn token_by_index(self: @TState, index: u256) -> u256;
+    fn token_of_owner_by_index(self: @TState, owner: ContractAddress, index: u256) -> u256;
+    // IERC721EnumerableCamel
+    fn totalSupply(self: @TState) -> u256;
+    fn tokenByIndex(self: @TState, index: u256) -> u256;
+    fn tokenOfOwnerByIndex(self: @TState, owner: ContractAddress, index: u256) -> u256;
+
+    // ERC721EnumMintBurn
+    fn initializer(
+        ref self: TState,
+        name: ByteArray,
+        symbol: ByteArray,
+        base_uri: ByteArray,
+        recipient: ContractAddress,
+        token_ids: Span<u256>
+    );
     fn mint(ref self: TState, to: ContractAddress, token_id: u256);
     fn burn(ref self: TState, token_id: u256);
+
+    fn dojo_resource(self: @TState,) -> felt252;
 }
 
 #[starknet::interface]
@@ -54,19 +91,6 @@ trait IERC721EnumInit<TState> {
 }
 
 #[starknet::interface]
-trait IERC721EnumTransfer<TState> {
-    fn balance_of(self: @TState, account: ContractAddress) -> u256;
-    fn transfer_from(ref self: TState, from: ContractAddress, to: ContractAddress, token_id: u256);
-    fn safe_transfer_from(
-        ref self: TState,
-        from: ContractAddress,
-        to: ContractAddress,
-        token_id: u256,
-        data: Span<felt252>
-    );
-}
-
-#[starknet::interface]
 trait IERC721EnumMintBurn<TState> {
     fn mint(ref self: TState, to: ContractAddress, token_id: u256);
     fn burn(ref self: TState, token_id: u256);
@@ -77,6 +101,7 @@ mod ERC721EnumMintBurn {
     use starknet::ContractAddress;
     use starknet::{get_contract_address, get_caller_address};
     use origami_token::components::security::initializable::initializable_component;
+    use origami_token::components::introspection::src5::src5_component;
     use origami_token::components::token::erc721::erc721_approval::erc721_approval_component;
     use origami_token::components::token::erc721::erc721_balance::erc721_balance_component;
     use origami_token::components::token::erc721::erc721_burnable::erc721_burnable_component;
@@ -87,6 +112,7 @@ mod ERC721EnumMintBurn {
 
     component!(path: initializable_component, storage: initializable, event: InitializableEvent);
 
+    component!(path: src5_component, storage: src5, event: SRC5Event);
     component!(
         path: erc721_approval_component, storage: erc721_approval, event: ERC721ApprovalEvent
     );
@@ -108,12 +134,26 @@ mod ERC721EnumMintBurn {
     impl InitializableImpl = initializable_component::InitializableImpl<ContractState>;
 
     #[abi(embed_v0)]
+    impl SRC5Impl = src5_component::SRC5Impl<ContractState>;
+
+    #[abi(embed_v0)]
+    impl SRC5CamelImpl = src5_component::SRC5CamelImpl<ContractState>;
+
+    #[abi(embed_v0)]
     impl ERC721ApprovalImpl =
         erc721_approval_component::ERC721ApprovalImpl<ContractState>;
 
     #[abi(embed_v0)]
     impl ERC721ApprovalCamelImpl =
         erc721_approval_component::ERC721ApprovalCamelImpl<ContractState>;
+
+    #[abi(embed_v0)]
+    impl ERC721BalanceImpl =
+        erc721_balance_component::ERC721BalanceImpl<ContractState>;
+
+    #[abi(embed_v0)]
+    impl ERC721BalanceCamelImpl =
+        erc721_balance_component::ERC721BalanceCamelImpl<ContractState>;
 
     #[abi(embed_v0)]
     impl ERC721EnumerableImpl =
@@ -133,6 +173,9 @@ mod ERC721EnumMintBurn {
 
     #[abi(embed_v0)]
     impl ERC721OwnerImpl = erc721_owner_component::ERC721OwnerImpl<ContractState>;
+
+    #[abi(embed_v0)]
+    impl ERC721OwnerCamelImpl = erc721_owner_component::ERC721OwnerCamelImpl<ContractState>;
 
     impl InitializableInternalImpl = initializable_component::InternalImpl<ContractState>;
     impl ERC721ApprovalInternalImpl = erc721_approval_component::InternalImpl<ContractState>;
@@ -157,6 +200,8 @@ mod ERC721EnumMintBurn {
         #[substorage(v0)]
         initializable: initializable_component::Storage,
         #[substorage(v0)]
+        src5: src5_component::Storage,
+        #[substorage(v0)]
         erc721_approval: erc721_approval_component::Storage,
         #[substorage(v0)]
         erc721_balance: erc721_balance_component::Storage,
@@ -177,6 +222,8 @@ mod ERC721EnumMintBurn {
     enum Event {
         #[flat]
         InitializableEvent: initializable_component::Event,
+        #[flat]
+        SRC5Event: src5_component::Event,
         #[flat]
         ERC721ApprovalEvent: erc721_approval_component::Event,
         #[flat]
@@ -209,6 +256,8 @@ mod ERC721EnumMintBurn {
             );
 
             self.erc721_metadata.initialize(name, symbol, base_uri);
+            self.erc721_enumerable.initialize();
+
             self.mint_assets(recipient, token_ids);
 
             self.initializable.initialize();
@@ -216,53 +265,13 @@ mod ERC721EnumMintBurn {
     }
 
     #[abi(embed_v0)]
-    impl TransferImpl of super::IERC721EnumTransfer<ContractState> {
-        fn balance_of(self: @ContractState, account: ContractAddress) -> u256 {
-            self.erc721_balance.get_balance(account).amount.into()
-        }
-
-        fn transfer_from(
-            ref self: ContractState, from: ContractAddress, to: ContractAddress, token_id: u256
-        ) {
-            assert(
-                self.erc721_approval.is_approved_or_owner(get_caller_address(), token_id),
-                Errors::UNAUTHORIZED
-            );
-            self.erc721_balance.transfer_internal(from, to, token_id);
-            self.erc721_enumerable.remove_token_from_owner_enumeration(from, token_id);
-            self.erc721_enumerable.add_token_to_owner_enumeration(to, token_id);
-        }
-
-        fn safe_transfer_from(
-            ref self: ContractState,
-            from: ContractAddress,
-            to: ContractAddress,
-            token_id: u256,
-            data: Span<felt252>
-        ) {
-            assert(
-                self.erc721_approval.is_approved_or_owner(get_caller_address(), token_id),
-                Errors::UNAUTHORIZED
-            );
-            self.erc721_balance.safe_transfer_internal(from, to, token_id, data);
-            self.erc721_enumerable.remove_token_from_owner_enumeration(from, token_id);
-            self.erc721_enumerable.add_token_to_owner_enumeration(to, token_id);
-        }
-    }
-
-    #[abi(embed_v0)]
     impl MintBurnImpl of super::IERC721EnumMintBurn<ContractState> {
         fn mint(ref self: ContractState, to: ContractAddress, token_id: u256) {
             self.erc721_mintable.mint(to, token_id);
-            self.erc721_enumerable.add_token_to_all_tokens_enumeration(token_id);
-            self.erc721_enumerable.add_token_to_owner_enumeration(to, token_id);
         }
 
         fn burn(ref self: ContractState, token_id: u256) {
             self.erc721_burnable.burn(token_id);
-            self.erc721_enumerable.remove_token_from_all_tokens_enumeration(token_id);
-            let owner = self.erc721_owner.owner_of(token_id);
-            self.erc721_enumerable.remove_token_from_owner_enumeration(owner, token_id);
         }
     }
 
@@ -276,10 +285,8 @@ mod ERC721EnumMintBurn {
                     break;
                 }
                 let id = *token_ids.pop_front().unwrap();
-
+                
                 self.erc721_mintable.mint(recipient, id);
-                self.erc721_enumerable.add_token_to_all_tokens_enumeration(id);
-                self.erc721_enumerable.add_token_to_owner_enumeration(recipient, id);
             }
         }
     }

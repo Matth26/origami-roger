@@ -3,24 +3,58 @@ use dojo::world::IWorldDispatcher;
 
 #[starknet::interface]
 trait IERC721MintableBurnablePreset<TState> {
-    // IERC721
-    fn name(self: @TState) -> ByteArray;
-    fn symbol(self: @TState) -> ByteArray;
-    fn token_uri(ref self: TState, token_id: u256) -> ByteArray;
-    fn owner_of(self: @TState, account: ContractAddress) -> bool;
-    fn balance_of(self: @TState, account: ContractAddress) -> u256;
-    fn get_approved(self: @TState, token_id: u256) -> ContractAddress;
-    fn transfer_from(ref self: TState, from: ContractAddress, to: ContractAddress, token_id: u256);
-    fn approve(ref self: TState, to: ContractAddress, token_id: u256);
-
-    // IERC721CamelOnly
-    fn tokenURI(ref self: TState, token_id: u256) -> ByteArray;
-    fn balanceOf(self: @TState, account: ContractAddress) -> u256;
-    fn transferFrom(ref self: TState, from: ContractAddress, to: ContractAddress, token_id: u256);
-
     // IWorldProvider
     fn world(self: @TState,) -> IWorldDispatcher;
 
+    // ISRC5
+    fn supports_interface(self: @TState, interface_id: felt252) -> bool;
+    // ISRC5Camel
+    fn supportsInterface(self: @TState, interfaceId: felt252) -> bool;
+
+    // IERC721Metadata
+    fn name(self: @TState) -> ByteArray;
+    fn symbol(self: @TState) -> ByteArray;
+    fn token_uri(ref self: TState, token_id: u256) -> ByteArray;
+    // IERC721MetadataCamel
+    fn tokenURI(ref self: TState, token_id: u256) -> ByteArray;
+
+    // IERC721Owner
+    fn owner_of(self: @TState, token_id: u256) -> ContractAddress;
+    // IERC721OwnerCamel
+    fn ownerOf(self: @TState, token_id: u256) -> ContractAddress;
+
+    // IERC721Balance
+    fn balance_of(self: @TState, account: ContractAddress) -> u256;
+    fn transfer_from(ref self: TState, from: ContractAddress, to: ContractAddress, token_id: u256);
+    fn safe_transfer_from(
+        ref self: TState,
+        from: ContractAddress,
+        to: ContractAddress,
+        token_id: u256,
+        data: Span<felt252>
+    );
+    // IERC721BalanceCamel
+    fn balanceOf(self: @TState, account: ContractAddress) -> u256;
+    fn transferFrom(ref self: TState, from: ContractAddress, to: ContractAddress, token_id: u256);
+    fn safeTransferFrom(
+        ref self: TState,
+        from: ContractAddress,
+        to: ContractAddress,
+        token_id: u256,
+        data: Span<felt252>
+    );
+
+    // IERC721Approval
+    fn get_approved(self: @TState, token_id: u256) -> ContractAddress;
+    fn is_approved_for_all(self: @TState, owner: ContractAddress, operator: ContractAddress) -> bool;
+    fn approve(ref self: TState, to: ContractAddress, token_id: u256);
+    fn set_approval_for_all(ref self: TState, operator: ContractAddress, approved: bool);
+    // IERC721ApprovalCamel
+    fn getApproved(self: @TState, token_id: u256) -> ContractAddress;
+    fn isApprovedForAll(self: @TState, owner: ContractAddress, operator: ContractAddress) -> bool;
+    fn setApprovalForAll(ref self: TState, operator: ContractAddress, approved: bool);
+
+    // ERC721MintableBurnable
     fn initializer(
         ref self: TState,
         name: ByteArray,
@@ -31,6 +65,7 @@ trait IERC721MintableBurnablePreset<TState> {
     );
     fn mint(ref self: TState, to: ContractAddress, token_id: u256);
     fn burn(ref self: TState, token_id: u256);
+
     fn dojo_resource(self: @TState,) -> felt252;
 }
 
@@ -57,21 +92,27 @@ mod ERC721MintableBurnable {
     use starknet::ContractAddress;
     use starknet::{get_caller_address, get_contract_address};
     use origami_token::components::security::initializable::initializable_component;
+    use origami_token::components::introspection::src5::src5_component;
     use origami_token::components::token::erc721::erc721_approval::erc721_approval_component;
     use origami_token::components::token::erc721::erc721_balance::erc721_balance_component;
     use origami_token::components::token::erc721::erc721_burnable::erc721_burnable_component;
+    use origami_token::components::token::erc721::erc721_enumerable::erc721_enumerable_component;
     use origami_token::components::token::erc721::erc721_metadata::erc721_metadata_component;
     use origami_token::components::token::erc721::erc721_mintable::erc721_mintable_component;
     use origami_token::components::token::erc721::erc721_owner::erc721_owner_component;
 
     component!(path: initializable_component, storage: initializable, event: InitializableEvent);
 
+    component!(path: src5_component, storage: src5, event: SRC5Event);
     component!(
         path: erc721_approval_component, storage: erc721_approval, event: ERC721ApprovalEvent
     );
     component!(path: erc721_balance_component, storage: erc721_balance, event: ERC721BalanceEvent);
     component!(
         path: erc721_burnable_component, storage: erc721_burnable, event: ERC721BurnableEvent
+    );
+    component!(
+        path: erc721_enumerable_component, storage: erc721_enumerable, event: ERC721EnumerableEvent
     );
     component!(
         path: erc721_metadata_component, storage: erc721_metadata, event: ERC721MetadataEvent
@@ -82,6 +123,12 @@ mod ERC721MintableBurnable {
     component!(path: erc721_owner_component, storage: erc721_owner, event: ERC721OwnerEvent);
 
     impl InitializableImpl = initializable_component::InitializableImpl<ContractState>;
+
+    #[abi(embed_v0)]
+    impl SRC5Impl = src5_component::SRC5Impl<ContractState>;
+
+    #[abi(embed_v0)]
+    impl SRC5CamelImpl = src5_component::SRC5CamelImpl<ContractState>;
 
     #[abi(embed_v0)]
     impl ERC721ApprovalImpl =
@@ -110,6 +157,9 @@ mod ERC721MintableBurnable {
     #[abi(embed_v0)]
     impl ERC721OwnerImpl = erc721_owner_component::ERC721OwnerImpl<ContractState>;
 
+    #[abi(embed_v0)]
+    impl ERC721OwnerCamelImpl = erc721_owner_component::ERC721OwnerCamelImpl<ContractState>;
+
     impl InitializableInternalImpl = initializable_component::InternalImpl<ContractState>;
     impl ERC721ApprovalInternalImpl = erc721_approval_component::InternalImpl<ContractState>;
     impl ERC721BalanceInternalImpl = erc721_balance_component::InternalImpl<ContractState>;
@@ -123,11 +173,15 @@ mod ERC721MintableBurnable {
         #[substorage(v0)]
         initializable: initializable_component::Storage,
         #[substorage(v0)]
+        src5: src5_component::Storage,
+        #[substorage(v0)]
         erc721_approval: erc721_approval_component::Storage,
         #[substorage(v0)]
         erc721_balance: erc721_balance_component::Storage,
         #[substorage(v0)]
         erc721_burnable: erc721_burnable_component::Storage,
+        #[substorage(v0)]
+        erc721_enumerable: erc721_enumerable_component::Storage,
         #[substorage(v0)]
         erc721_metadata: erc721_metadata_component::Storage,
         #[substorage(v0)]
@@ -142,11 +196,15 @@ mod ERC721MintableBurnable {
         #[flat]
         InitializableEvent: initializable_component::Event,
         #[flat]
+        SRC5Event: src5_component::Event,
+        #[flat]
         ERC721ApprovalEvent: erc721_approval_component::Event,
         #[flat]
         ERC721BalanceEvent: erc721_balance_component::Event,
         #[flat]
         ERC721BurnableEvent: erc721_burnable_component::Event,
+        #[flat]
+        ERC721EnumerableEvent: erc721_enumerable_component::Event,
         #[flat]
         ERC721MetadataEvent: erc721_metadata_component::Event,
         #[flat]
