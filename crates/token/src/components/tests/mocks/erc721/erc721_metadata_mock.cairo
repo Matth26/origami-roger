@@ -8,8 +8,6 @@ mod erc721_metadata_mock {
     use origami_token::components::token::erc721::erc721_enumerable::erc721_enumerable_component;
     use origami_token::components::token::erc721::erc721_owner::erc721_owner_component;
 
-    use origami_token::components::token::erc721::erc721_metadata_hooks::ERC721MetadataHooksEmptyImpl;
-
     component!(path: src5_component, storage: src5, event: SRC5Event);
     component!(
         path: erc721_approval_component, storage: erc721_approval, event: ERC721ApprovalEvent

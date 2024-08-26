@@ -14,7 +14,7 @@ trait IERC721EnumMintBurnPreset<TState> {
     // IERC721Metadata
     fn name(self: @TState) -> ByteArray;
     fn symbol(self: @TState) -> ByteArray;
-    fn token_uri(self: @TState, token_id: u256) -> ByteArray;
+    fn token_uri(ref self: TState, token_id: u256) -> ByteArray;
     // IERC721MetadataCamel
     fn tokenURI(self: @TState, token_id: u256) -> ByteArray;
 
@@ -109,8 +109,6 @@ mod ERC721EnumMintBurn {
     use origami_token::components::token::erc721::erc721_metadata::erc721_metadata_component;
     use origami_token::components::token::erc721::erc721_mintable::erc721_mintable_component;
     use origami_token::components::token::erc721::erc721_owner::erc721_owner_component;
-
-    use origami_token::components::token::erc721::erc721_metadata_hooks::ERC721MetadataHooksEmptyImpl;
 
     component!(path: initializable_component, storage: initializable, event: InitializableEvent);
 
